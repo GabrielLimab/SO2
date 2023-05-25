@@ -2,13 +2,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-// Function to create the memory
-void createMemory(int memorySize, int pageSize){
-  int memory[memorySize/pageSize];
+// Function to create the memory and return it
+int* createMemory(int memorySize, int pageSize){
+  // Variables
+  int* memory = malloc(memorySize/pageSize * sizeof(int));
   int i;
-  for(i = 0; i < memorySize/pageSize; i++){
-    memory[i] = -1;
-  }
+
+  return memory;
 }
 
 int main(int argc, char* argv[]){
@@ -25,7 +25,7 @@ int main(int argc, char* argv[]){
   printf("Page size: %d\n", pageSize);
 
   // Create memory
-  createMemory(memorySize, pageSize);
+  int* memory = createMemory(memorySize, pageSize);
   
 
   return 0;
