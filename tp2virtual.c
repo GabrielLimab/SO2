@@ -8,6 +8,17 @@ int* createMemory(int memorySize, int pageSize){
   int* memory = malloc(memorySize/pageSize * sizeof(int));
   int i;
 
+  // Fill memory with -1
+  for(i = 0; i < memorySize/pageSize; i++){
+    memory[i] = -1;
+  }
+
+  // print memory
+  for(i = 0; i < memorySize/pageSize; i++){
+    printf("%d ", memory[i]);
+  }
+  printf("\n");
+
   return memory;
 }
 
