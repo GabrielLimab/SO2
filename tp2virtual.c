@@ -7,6 +7,8 @@ typedef struct Page{
   int lastAccess;
   int reference;
   int altered;
+  int entry;
+  int frame;
 } Page;
 
 // Global variables for arguments
@@ -69,6 +71,44 @@ void parseArgs(int argc, char* argv[]){
   memorySize = atoi(argv[4]);
 }
 
+int lru(Page* memory, int pageSize, int memorySize){
+  int i = 0;
+  int min = memory[0].lastAccess;
+  int index = 0;
+
+  while(i < memorySize/pageSize){
+    if (memory[i].lastAccess < min){
+      min = memory[i].lastAccess;
+      index = i;
+    }
+    i++;
+  }
+
+  return index;
+}
+
+int fifo(Page* memory, int pageSize, int memorySize){
+  int i = 0;
+  int min = memory[0].entry;
+  int index = 0;
+
+  while(i < memorySize/pageSize){
+    if (memory[i].entry < min){
+      min = memory[i].entry;
+      index = i;
+    }
+    i++;
+  }
+
+  return index;
+}
+
+int randomAlg(Page* memory, int pageSize, int memorySize){
+  int index = rand() % (memorySize/pageSize);
+
+  return index;
+}
+
 int main(int argc, char* argv[]){
   // Parse arguments
   parseArgs(argc, argv);
@@ -129,6 +169,7 @@ int main(int argc, char* argv[]){
       Page* page = malloc(sizeof(Page));
       page->lastAccess = 0;
       page->reference = 1;
+      page->entry = time;
       if (rw == 'W'){
         page->altered = 1;
       }
@@ -144,8 +185,23 @@ int main(int argc, char* argv[]){
         i++;
       }
       else{
-        printf("Memory full\n");
-        break;
+        // replace page
+        if (strcmp(algorithm, "lru") == 0){
+          int index = lru(memory, pageSize, memorySize);
+          memory[index] = *page;
+        }
+        else if (strcmp(algorithm, "fifo") == 0){
+          int index = fifo(memory, pageSize, memorySize);
+          memory[index] = *page;
+        }
+        else if (strcmp(algorithm, "random") == 0){
+          int index = randomAlg(memory, pageSize, memorySize);
+          memory[index] = *page;
+        }
+        else{
+          printf("Invalid algorithm\n");
+          break;
+        }
       }
       free(page);
     }
