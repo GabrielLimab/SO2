@@ -3,7 +3,7 @@
 #include <string.h>
 
 typedef struct Page{
-  unsigned id;
+  int id;
   int lastAccess;
   int reference;
   int referenceBit;
@@ -141,7 +141,10 @@ void parseArgs(int argc, char* argv[]){
   }
   else if (strcmp(algorithm, "random") == 0){
     algorithmFunction = &randomAlg;
-  }  
+  }
+  else if (strcmp(algorithm, "2a") == 0){
+    algorithmFunction = &secondChance;
+  }
 }
 
 int main(int argc, char* argv[]){
@@ -169,7 +172,7 @@ int main(int argc, char* argv[]){
 
   printf("S: %d\n", s);
 
-  unsigned addr;
+  int addr;
   char rw;
   FILE* file = fopen(inputFile, "r");
   int i = 0;
@@ -179,11 +182,10 @@ int main(int argc, char* argv[]){
     // check if page is in memory
     int k = 0;
     int found = 0;
-    unsigned id = addr >> s;
+    int id = addr >> s;
 
-    // search for page
     while(k < numberOfPages){
-      if (memory[k].id == 0){
+      if (memory[k].id == -1){
         break;
       }
       if(memory[k].id == id){
@@ -233,15 +235,18 @@ int main(int argc, char* argv[]){
   }
 
   //print memory
-  int j = 0;
+  if (debug == 1)
+  {   
+    int j = 0;
 
-  while(j < numberOfPages){
-    printf("Page id: %x\n", memory[j].id);
-    printf("Last access: %d\n", memory[j].lastAccess);
-    printf("Reference: %d\n", memory[j].reference);
-    printf("Altered: %d\n", memory[j].altered);
-    printf("\n");
-    j++;
+    while(j < numberOfPages){
+      printf("Page id: %x\n", memory[j].id);
+      printf("Last access: %d\n", memory[j].lastAccess);
+      printf("Reference: %d\n", memory[j].reference);
+      printf("Altered: %d\n", memory[j].altered);
+      printf("\n");
+      j++;
+    }
   }
 
   free(memory);
