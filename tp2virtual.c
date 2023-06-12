@@ -3,20 +3,81 @@
 #include <string.h>
 
 typedef struct Page{
-  char id[8];
+  unsigned id;
   int lastAccess;
   int reference;
+  int referenceBit;
   int altered;
   int entry;
-  int frame;
 } Page;
 
 // Global variables for arguments
 char* algorithm;
+int (*algorithmFunction)(Page[], int);
 char* inputFile;
 int pageSize;
 int memorySize;
 int debug;
+
+int lru(Page* memory, int numberOfPages){
+  int i = 0;
+  int min = memory[0].lastAccess;
+  int index = 0;
+
+  while(i < numberOfPages){
+    if (memory[i].lastAccess < min){
+      min = memory[i].lastAccess;
+      index = i;
+    }
+    i++;
+  }
+
+  return index;
+}
+
+int fifo(Page* memory, int numberOfPages){
+  int i = 0;
+  int min = memory[0].entry;
+  int index = 0;
+
+  while(i < numberOfPages){
+    if (memory[i].entry < min){
+      min = memory[i].entry;
+      index = i;
+    }
+    i++;
+  }
+
+  return index;
+}
+
+int secondChance(Page* memory, int numberOfPages){
+  int i = 0;
+  int index = -1;
+
+  while(index == -1){
+    if (memory[i].referenceBit == 0){
+      index = i;
+      break;
+    }
+    else{
+      memory[i].referenceBit = 0;
+    }
+    i++;
+
+    if (i == numberOfPages){
+      i = 0;
+    }
+  }
+
+  return index;
+}
+
+int randomAlg(Page* memory, int numberOfPages){
+  int index = rand() % (numberOfPages);
+
+  return index;
+}
 
 void printUsage() {
   fprintf(stderr, "Usage: ./tp2virtual <algorithm> <input file> <page size> <memory size> <debug?>\n");
@@ -69,44 +130,18 @@ void parseArgs(int argc, char* argv[]){
   inputFile = argv[2];
   pageSize = atoi(argv[3]);
   memorySize = atoi(argv[4]);
-}
 
-int lru(Page* memory, int pageSize, int memorySize){
-  int i = 0;
-  int min = memory[0].lastAccess;
-  int index = 0;
+  algorithmFunction = NULL;
 
-  while(i < memorySize/pageSize){
-    if (memory[i].lastAccess < min){
-      min = memory[i].lastAccess;
-      index = i;
-    }
-    i++;
+  if (strcmp(algorithm, "lru") == 0){
+    algorithmFunction = &lru;
   }
-
-  return index;
-}
-
-int fifo(Page* memory, int pageSize, int memorySize){
-  int i = 0;
-  int min = memory[0].entry;
-  int index = 0;
-
-  while(i < memorySize/pageSize){
-    if (memory[i].entry < min){
-      min = memory[i].entry;
-      index = i;
-    }
-    i++;
+  else if (strcmp(algorithm, "fifo") == 0){
+    algorithmFunction = &fifo;
   }
-
-  return index;
-}
-
-int randomAlg(Page* memory, int pageSize, int memorySize){
-  int index = rand() % (memorySize/pageSize);
-
-  return index;
+  else if (strcmp(algorithm, "random") == 0){
+    algorithmFunction = &randomAlg;
+  }  
 }
 
 int main(int argc, char* argv[]){
@@ -116,11 +151,13 @@ int main(int argc, char* argv[]){
   // Print variables
   printf("Algorithm: %s\n", algorithm);
   printf("Input file: %s\n", inputFile);
-  printf("Memory size: %d KB\n", memorySize);
   printf("Page size: %d KB\n", pageSize);
+  printf("Memory size: %d KB\n", memorySize);
   printf("Debug: %d\n", debug);
 
-  Page* memory = malloc(sizeof(Page) * memorySize/pageSize);
+  // Initialize memory
+  int numberOfPages = memorySize/pageSize;
+  Page* memory = malloc(sizeof(Page) * numberOfPages);
 
   int tmp = pageSize * 1024;
   int s = 0;
@@ -130,34 +167,33 @@ int main(int argc, char* argv[]){
     s++;
   }
 
-  s = s/4;
-
   printf("S: %d\n", s);
 
-  char addr[8];
+  unsigned addr;
   char rw;
   FILE* file = fopen(inputFile, "r");
   int i = 0;
   int time = 0;
 
-  while(fscanf(file, "%s %c", addr, &rw) != EOF){
+  while(fscanf(file, "%x %c", &addr, &rw) != EOF){
     // check if page is in memory
     int k = 0;
     int found = 0;
-    char id[8];
-    strncpy(id, addr, 8-s);
+    unsigned id = addr >> s;
 
-    while(k < memorySize/pageSize){
-      if (memory[k].id[0] == '\0'){
+    // search for page
+    while(k < numberOfPages){
+      if (memory[k].id == 0){
         break;
       }
-      if(strcmp(memory[k].id, id) == 0){
+      if(memory[k].id == id){
         found = 1;
         break;
       }
       k++;
     }
 
+    // update page
     if (found == 1){
       memory[k].lastAccess = time;
       memory[k].reference++;
@@ -165,10 +201,13 @@ int main(int argc, char* argv[]){
         memory[k].altered++;
       }
     }
+    // add page to memory
     else{
       Page* page = malloc(sizeof(Page));
+      page->id = id;
       page->lastAccess = 0;
       page->reference = 1;
+      page->referenceBit = 1;
       page->entry = time;
       if (rw == 'W'){
         page->altered = 1;
@@ -177,31 +216,15 @@ int main(int argc, char* argv[]){
         page->altered = 0;
       }
 
-      // get page id
-      strcpy(page->id, id);
-
-      if(i < memorySize/pageSize){
+      // add page to memory if there is space
+      if(i < numberOfPages){
         memory[i] = *page;
         i++;
       }
+      // replace existing page if there is no space
       else{
-        // replace page
-        if (strcmp(algorithm, "lru") == 0){
-          int index = lru(memory, pageSize, memorySize);
-          memory[index] = *page;
-        }
-        else if (strcmp(algorithm, "fifo") == 0){
-          int index = fifo(memory, pageSize, memorySize);
-          memory[index] = *page;
-        }
-        else if (strcmp(algorithm, "random") == 0){
-          int index = randomAlg(memory, pageSize, memorySize);
-          memory[index] = *page;
-        }
-        else{
-          printf("Invalid algorithm\n");
-          break;
-        }
+        int index = algorithmFunction(memory, numberOfPages);
+        memory[index] = *page;
       }
       free(page);
     }
@@ -212,8 +235,8 @@ int main(int argc, char* argv[]){
   //print memory
   int j = 0;
 
-  while(j < memorySize/pageSize){
-    printf("Page id: %s\n", memory[j].id);
+  while(j < numberOfPages){
+    printf("Page id: %x\n", memory[j].id);
     printf("Last access: %d\n", memory[j].lastAccess);
     printf("Reference: %d\n", memory[j].reference);
     printf("Altered: %d\n", memory[j].altered);
