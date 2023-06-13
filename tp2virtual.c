@@ -151,16 +151,18 @@ int main(int argc, char* argv[]){
   // Parse arguments
   parseArgs(argc, argv);
 
-  // Print variables
-  printf("Algorithm: %s\n", algorithm);
-  printf("Input file: %s\n", inputFile);
-  printf("Page size: %d KB\n", pageSize);
-  printf("Memory size: %d KB\n", memorySize);
-  printf("Debug: %d\n", debug);
-
   // Initialize memory
   int numberOfPages = memorySize/pageSize;
   Page* memory = malloc(sizeof(Page) * numberOfPages);
+
+  for (int i = 0; i < numberOfPages; i++){
+    memory[i].id = -1;
+    memory[i].lastAccess = 0;
+    memory[i].reference = 0;
+    memory[i].referenceBit = 0;
+    memory[i].altered = 0;
+    memory[i].entry = 0;
+  }
 
   int tmp = pageSize * 1024;
   int s = 0;
@@ -170,20 +172,24 @@ int main(int argc, char* argv[]){
     s++;
   }
 
-  printf("S: %d\n", s);
-
   int addr;
   char rw;
   FILE* file = fopen(inputFile, "r");
   int i = 0;
   int time = 0;
 
+  int memoryAccesses = 0;
+  int pageFaults = 0;
+  int diskWrites = 0;
+
   while(fscanf(file, "%x %c", &addr, &rw) != EOF){
     // check if page is in memory
     int k = 0;
     int found = 0;
     int id = addr >> s;
-
+    
+    memoryAccesses++;
+  
     while(k < numberOfPages){
       if (memory[k].id == -1){
         break;
@@ -202,15 +208,19 @@ int main(int argc, char* argv[]){
       if(rw == 'W'){
         memory[k].altered++;
       }
+      memory[k].referenceBit = 1;
     }
     // add page to memory
     else{
       Page* page = malloc(sizeof(Page));
       page->id = id;
-      page->lastAccess = 0;
+      page->lastAccess = time;
       page->reference = 1;
       page->referenceBit = 1;
       page->entry = time;
+
+      pageFaults++;
+
       if (rw == 'W'){
         page->altered = 1;
       }
@@ -226,28 +236,26 @@ int main(int argc, char* argv[]){
       // replace existing page if there is no space
       else{
         int index = algorithmFunction(memory, numberOfPages);
+        if (memory[index].altered > 0){
+          diskWrites++;
+        }
         memory[index] = *page;
       }
       free(page);
     }
-
+    
     time++;
   }
-
-  //print memory
-  if (debug == 1)
-  {   
-    int j = 0;
-
-    while(j < numberOfPages){
-      printf("Page id: %x\n", memory[j].id);
-      printf("Last access: %d\n", memory[j].lastAccess);
-      printf("Reference: %d\n", memory[j].reference);
-      printf("Altered: %d\n", memory[j].altered);
-      printf("\n");
-      j++;
-    }
-  }
+  
+  // print variables
+  printf("Executando o simulador...\n");  
+  printf("Arquivo de entrada: %s\n", inputFile);
+  printf("Tamanho da memoria: %d KB\n", memorySize);
+  printf("Tamanho das paginas: %d KB\n", pageSize);
+  printf("Tecnica de reposicao: %s\n", algorithm);
+  printf("Numero de acessos a memoria: %d\n", memoryAccesses);
+  printf("Paginas lidas: %d\n", pageFaults);
+  printf("Paginas escritas: %d\n", diskWrites);
 
   free(memory);
 
