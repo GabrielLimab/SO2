@@ -4,11 +4,10 @@
 
 typedef struct Page{
   int id;
-  int lastAccess;
-  int reference;
-  int referenceBit;
   int altered;
-  int entry;
+  int lastAccess; // LRU
+  int referenceBit; // 2a
+  int entry;  // FIFO
 } Page;
 
 // Global variables for arguments
@@ -18,6 +17,7 @@ char* inputFile;
 int pageSize;
 int memorySize;
 int debug;
+int secondChanceIndex = 0;
 
 int lru(Page* memory, int numberOfPages){
   int i = 0;
@@ -52,21 +52,20 @@ int fifo(Page* memory, int numberOfPages){
 }
 
 int secondChance(Page* memory, int numberOfPages){
-  int i = 0;
   int index = -1;
 
   while(index == -1){
-    if (memory[i].referenceBit == 0){
-      index = i;
+    if (memory[secondChanceIndex].referenceBit == 0){
+      index = secondChanceIndex;
       break;
     }
     else{
-      memory[i].referenceBit = 0;
+      memory[secondChanceIndex].referenceBit = 0;
     }
-    i++;
+    secondChanceIndex++;
 
-    if (i == numberOfPages){
-      i = 0;
+    if (secondChanceIndex == numberOfPages){
+      secondChanceIndex = 0;
     }
   }
 
@@ -148,6 +147,9 @@ void parseArgs(int argc, char* argv[]){
 }
 
 int main(int argc, char* argv[]){
+  char debugString[100];
+  srand(42);
+
   // Parse arguments
   parseArgs(argc, argv);
 
@@ -157,10 +159,9 @@ int main(int argc, char* argv[]){
 
   for (int i = 0; i < numberOfPages; i++){
     memory[i].id = -1;
-    memory[i].lastAccess = 0;
-    memory[i].reference = 0;
-    memory[i].referenceBit = 0;
     memory[i].altered = 0;
+    memory[i].lastAccess = 0;
+    memory[i].referenceBit = 0;
     memory[i].entry = 0;
   }
 
@@ -204,18 +205,21 @@ int main(int argc, char* argv[]){
     // update page
     if (found == 1){
       memory[k].lastAccess = time;
-      memory[k].reference++;
+
       if(rw == 'W'){
-        memory[k].altered++;
+        memory[k].altered = 1;
       }
       memory[k].referenceBit = 1;
+
+      if (debug == 1){
+        sprintf(debugString, "Pagina %d foi encontrada na memoria (%c) no tempo %d\n", id, rw, time);
+      }
     }
     // add page to memory
     else{
       Page* page = malloc(sizeof(Page));
       page->id = id;
       page->lastAccess = time;
-      page->reference = 1;
       page->referenceBit = 1;
       page->entry = time;
 
@@ -232,18 +236,31 @@ int main(int argc, char* argv[]){
       if(i < numberOfPages){
         memory[i] = *page;
         i++;
+
+        if (debug == 1){
+          sprintf(debugString, "Pagina %d foi adicionada a memoria (%c) no tempo %d\n", id, rw, time);
+        }
       }
       // replace existing page if there is no space
       else{
         int index = algorithmFunction(memory, numberOfPages);
-        if (memory[index].altered > 0){
+        if (memory[index].altered == 1) {
           diskWrites++;
         }
+        int oldId = memory[index].id;
         memory[index] = *page;
+
+        if (debug == 1){
+          sprintf(debugString, "Pagina %d foi adicionada a memoria (%c) no tempo %d, substituindo a pagina %d\n", id, rw, time, oldId);
+        }
       }
       free(page);
     }
     
+    if (debug == 1){
+      printf("%s", debugString);
+    }
+
     time++;
   }
   
